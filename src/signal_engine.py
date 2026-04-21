@@ -10,16 +10,63 @@ from .logger import log
 from .models import Signal, SignalStatus, WalletTrade
 
 
+# Wallets marked as solo_follow
+_SOLO_WALLETS = {w.name for w in config.wallets if w.solo_follow}
+
+
 class SignalEngine:
     def __init__(self, db: Database):
         self.db = db
         self._pending_trades: dict[str, list[WalletTrade]] = defaultdict(list)
 
     def ingest(self, trades: list[WalletTrade]) -> list[Signal]:
-        """Ingest new trades, group by market+direction, emit confirmed signals."""
+        """Ingest new trades. Emit signals from consensus OR solo-follow wallets."""
         now = datetime.now(timezone.utc)
         window = timedelta(minutes=config.trading.signal_window_minutes)
 
+        solo_signals: list[Signal] = []
+        consensus_trades: list[WalletTrade] = []
+
+        for trade in trades:
+            if trade.wallet_name in _SOLO_WALLETS:
+                solo_signals.append(self._make_solo_signal(trade))
+            else:
+                consensus_trades.append(trade)
+
+        consensus_signals = self._process_consensus(consensus_trades, now, window)
+        return solo_signals + consensus_signals
+
+    def _make_solo_signal(self, trade: WalletTrade) -> Signal:
+        signal = Signal(
+            market_key=trade.market_key,
+            market_slug=trade.market_slug,
+            question=trade.question,
+            outcome=trade.outcome,
+            side=trade.side,
+            sources=[trade],
+            status=SignalStatus.CONFIRMED,
+        )
+
+        self.db.insert_signal(
+            market_key=signal.market_key,
+            market_slug=signal.market_slug,
+            question=signal.question,
+            outcome=signal.outcome,
+            side=signal.side.value,
+            consensus_count=1,
+            source_names=trade.wallet_name,
+            avg_price=signal.avg_price,
+            status=signal.status.value,
+        )
+
+        log(f"SOLO: {trade.wallet_name} → "
+            f"{trade.side.value} {trade.outcome} @ ${trade.price:.3f} "
+            f"on {trade.market_slug}",
+            "signal")
+        return signal
+
+    def _process_consensus(self, trades: list[WalletTrade],
+                           now: datetime, window: timedelta) -> list[Signal]:
         for trade in trades:
             key = f"{trade.market_key}:{trade.direction_key}"
             self._pending_trades[key].append(trade)
@@ -46,7 +93,7 @@ class SignalEngine:
                 status=SignalStatus.CONFIRMED,
             )
 
-            signal_id = self.db.insert_signal(
+            self.db.insert_signal(
                 market_key=signal.market_key,
                 market_slug=signal.market_slug,
                 question=signal.question,
@@ -58,7 +105,7 @@ class SignalEngine:
                 status=signal.status.value,
             )
 
-            log(f"SIGNAL: {signal.consensus_count} traders agree → "
+            log(f"CONSENSUS: {signal.consensus_count} traders agree → "
                 f"{signal.side.value} {signal.outcome} @ avg ${signal.avg_price:.3f} "
                 f"on {signal.market_slug} "
                 f"[{', '.join(signal.source_names)}]",

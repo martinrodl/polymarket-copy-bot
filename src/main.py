@@ -156,11 +156,11 @@ def run_wallets(args) -> None:
         return
 
     print(f"\n{'─' * 60}")
-    print(f"  {'Name':<15s} {'Category':<12s} {'Weight':<8s} Address")
+    print(f"  {'Name':<15s} {'Basket':<12s} {'Weight':<8s} Address")
     print(f"{'─' * 60}")
     for w in config.wallets:
         addr = w.address[:10] + "..." + w.address[-6:] if len(w.address) > 20 else w.address
-        print(f"  {w.name:<15s} {w.category:<12s} {w.weight:<8.1f} {addr}")
+        print(f"  {w.name:<15s} {w.basket:<12s} {w.weight:<8.1f} {addr}")
     print(f"{'─' * 60}\n")
 
     if args.test:

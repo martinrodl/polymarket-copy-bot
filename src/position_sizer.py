@@ -94,7 +94,7 @@ def _estimate_win_probability(signal: Signal) -> float:
     # Base: trust the market price
     p = market_prob
 
-    # Consensus bonus: each additional trader beyond minimum adds edge
+    # Solo follow gets smaller bonus than consensus
     consensus_bonus = (consensus - 1) * 0.03  # +3% per extra trader
 
     # Confidence bonus from wallet quality weights

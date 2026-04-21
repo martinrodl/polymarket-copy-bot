@@ -39,18 +39,24 @@ def _env_int(key: str, default: int = 0) -> int:
 class WalletTarget:
     name: str
     address: str
-    category: str = "general"
+    basket: str = "sports"
     weight: float = 1.0
+    solo_follow: bool = False  # bypass consensus, copy every trade
 
 
-# Default basket — addresses must be filled in .env or passed at runtime
-DEFAULT_BASKET = [
-    WalletTarget("BAdiosB", _env("WALLET_BADIOSB"), "mispricing", 1.0),
-    WalletTarget("LucasMeow", _env("WALLET_LUCASMEOW"), "crypto", 0.8),
-    WalletTarget("Erasmus", _env("WALLET_ERASMUS"), "politics", 0.9),
-    WalletTarget("elkmonkey", _env("WALLET_ELKMONKEY"), "sports", 0.7),
-    WalletTarget("gatorr", _env("WALLET_GATORR"), "general", 0.7),
+SPORTS_BASKET = [
+    WalletTarget("elkmonkey", _env("WALLET_ELKMONKEY"), "sports", 1.0),
+    WalletTarget("sovereign2013", _env("WALLET_SOVEREIGN2013"), "sports", 1.0),
+    WalletTarget("CarlosMC", _env("WALLET_CARLOSMC"), "sports", 0.9),
+    WalletTarget("gatorr", _env("WALLET_GATORR"), "sports", 0.8),
+    WalletTarget("swisstony", _env("WALLET_SWISSTONY"), "sports", 0.7),
 ]
+
+SOLO_FOLLOW = [
+    WalletTarget("Erasmus", _env("WALLET_ERASMUS"), "geopolitics", 0.9, solo_follow=True),
+]
+
+ALL_WALLETS = SPORTS_BASKET + SOLO_FOLLOW
 
 
 @dataclass(frozen=True)
@@ -112,7 +118,7 @@ class Config:
     api: APIConfig = field(default_factory=APIConfig)
     trading: TradingConfig = field(default_factory=TradingConfig)
     alerts: AlertsConfig = field(default_factory=AlertsConfig)
-    wallets: list[WalletTarget] = field(default_factory=lambda: [w for w in DEFAULT_BASKET if w.address])
+    wallets: list[WalletTarget] = field(default_factory=lambda: [w for w in ALL_WALLETS if w.address])
     db_path: Path = field(default_factory=lambda: Path(__file__).resolve().parent.parent / "data" / "copytrade.db")
 
 
